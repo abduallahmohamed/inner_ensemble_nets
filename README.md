@@ -2,7 +2,7 @@
 ### Abduallah Mohamed, Muhammed Mohaimin Sadiq, Ehab AlBadawy <br />
 ### Mohamed Elhoseiny** , Christian Claudel**
 ##### <sup>**</sup> Equal advising
-Read full paper <a href="#">here</a> </br> </br>
+Read full paper <a href="https://arxiv.org/abs/2006.08305">here</a> </br> </br>
 We introduce Inner Ensemble Networks (IENs) which reduce the variance within the neural network itself without an increase in the model complexity.
 IENs utilize ensemble parameters during the training phase to reduce the network variance. While in the testing phase, these parameters are removed without a change in the enhanced performance.
 IENs reduce the variance of an ordinary deep model by a factor of <img src="https://latex.codecogs.com/svg.latex?1/m^{L-1}" />, where m is the number of inner ensembles and L is the depth of the model.
