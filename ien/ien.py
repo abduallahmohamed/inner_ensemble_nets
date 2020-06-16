@@ -7,16 +7,7 @@ import torch.nn.functional as F
 import numpy as np
 
 def ien_normal_(tensor, a=0,m=4, mode='fan_in', nonlinearity='relu'):
-    r"""Fills the input `Tensor` with values according to the method
-    described in `Delving deep into rectifiers: Surpassing human-level
-    performance on ImageNet classification` - He, K. et al. (2015), using a
-    normal distribution. The resulting tensor will have values sampled from
-    :math:`\mathcal{N}(0, \text{std}^2)` where
-
-    .. math::
-        \text{std} = \frac{\text{gain}}{\sqrt{\text{fan\_mode}}}
-
-    Also known as Abdu initialization.
+    r"""
 
     Args:
         tensor: an n-dimensional `torch.Tensor`
@@ -31,7 +22,7 @@ def ien_normal_(tensor, a=0,m=4, mode='fan_in', nonlinearity='relu'):
 
     Examples:
         >>> w = torch.empty(3, 5)
-        >>> nn.init.kaiming_normal_(w, mode='fan_out', nonlinearity='relu')
+        >>> ien_normal_(w, mode='fan_out', nonlinearity='relu')
     """
     
     # fan = _calculate_correct_fan(tensor, mode)
