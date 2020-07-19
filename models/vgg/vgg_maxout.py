@@ -5,8 +5,7 @@ import math
 
 import torch.nn as nn
 import torch.nn.init as init
-import ien.ien
-from ien.ien import Conv2d_maxout
+from iea.maxout import Conv2d_maxout
 
 __all__ = [
     'VGG', 'vgg11', 'vgg11_bn', 'vgg13', 'vgg13_bn', 'vgg16', 'vgg16_bn',
@@ -18,7 +17,7 @@ class VGG(nn.Module):
     '''
     VGG model 
     '''
-    def __init__(self, features):
+    def __init__(self, features, dataset):
         super(VGG, self).__init__()
         self.features = features
         self.classifier = nn.Sequential(
@@ -28,7 +27,7 @@ class VGG(nn.Module):
             nn.Dropout(),
             nn.Linear(512, 512),
             nn.ReLU(True),
-            nn.Linear(512, 10),
+            nn.Linear(512, 10) if dataset=='cifar10' else nn.Linear(512, 100),
         )
          # Initialize weights
         #for m in self.modules():
@@ -70,41 +69,41 @@ cfg = {
 }
 
 
-def vgg11(m):
+def vgg11(m, dataset):
     """VGG 11-layer model (configuration "A")"""
-    return VGG(make_layers(cfg['A'], m=int(m)))
+    return VGG(make_layers(cfg['A'], m=int(m)), dataset)
 
 
-def vgg11_bn(m):
+def vgg11_bn(m, dataset):
     """VGG 11-layer model (configuration "A") with batch normalization"""
-    return VGG(make_layers(cfg['A'], batch_norm=True, m=int(m)))
+    return VGG(make_layers(cfg['A'], batch_norm=True, m=int(m)), dataset)
 
 
-def vgg13(m):
+def vgg13(m, dataset):
     """VGG 13-layer model (configuration "B")"""
-    return VGG(make_layers(cfg['B'], m=int(m)))
+    return VGG(make_layers(cfg['B'], m=int(m)), dataset)
 
 
-def vgg13_bn(m):
+def vgg13_bn(m, dataset):
     """VGG 13-layer model (configuration "B") with batch normalization"""
-    return VGG(make_layers(cfg['B'], batch_norm=True, m=int(m)))
+    return VGG(make_layers(cfg['B'], batch_norm=True, m=int(m)), dataset)
 
 
-def vgg16(m):
+def vgg16(m, dataset):
     """VGG 16-layer model (configuration "D")"""
-    return VGG(make_layers(cfg['D'], m=int(m)))
+    return VGG(make_layers(cfg['D'], m=int(m)), dataset)
 
 
-def vgg16_bn(m):
+def vgg16_bn(m, dataset):
     """VGG 16-layer model (configuration "D") with batch normalization"""
-    return VGG(make_layers(cfg['D'], batch_norm=True, m=int(m)))
+    return VGG(make_layers(cfg['D'], batch_norm=True, m=int(m)), dataset)
 
 
-def vgg19(m):
+def vgg19(m, dataset):
     """VGG 19-layer model (configuration "E")"""
-    return VGG(make_layers(cfg['E'], m=int(m)))
+    return VGG(make_layers(cfg['E'], m=int(m)), dataset)
 
 
-def vgg19_bn(m):
+def vgg19_bn(m, dataset):
     """VGG 19-layer model (configuration 'E') with batch normalization"""
-    return VGG(make_layers(cfg['E'], batch_norm=True, m=int(m)))
+    return VGG(make_layers(cfg['E'], batch_norm=True, m=int(m)), dataset)

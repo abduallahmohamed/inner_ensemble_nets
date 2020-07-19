@@ -98,6 +98,14 @@ parser.add_argument('-v', '--version', default=None, type=int,
 parser.add_argument('-m', '--Mense', default=4, type=int,
                     help='number of ensembles ') 
 
+dataset_names = ['cifar10', 'cifar100']
+                
+parser.add_argument('-d', '--dataset', default='cifar10',
+                    choices=dataset_names,
+                    help='dataset: ' +
+                        ' | '.join(dataset_names) +
+                        ' (default: cifar10)')
+
 
 
 best_acc1 = 0
@@ -164,9 +172,9 @@ def main_worker(gpu, ngpus_per_node, args):
     else:
         print("=> creating model '{}'".format(args.arch))
         if args.variation == 'base':
-            model = models.__dict__[args.arch]()
+            model = models.__dict__[args.arch](args.dataset)
         else:
-            model = models.__dict__[args.arch](args.Mense)
+            model = models.__dict__[args.arch](args.Mense, args.dataset)
     #parameter count
     #import numpy as np
     #model_parameters = filter(lambda p: p.requires_grad, model.parameters())
@@ -243,13 +251,21 @@ def main_worker(gpu, ngpus_per_node, args):
     # Data loading code
     normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                      std=[0.229, 0.224, 0.225])
-
-    train_dataset = datasets.CIFAR10(root='./data', train=True, transform=transforms.Compose([
-            transforms.RandomHorizontalFlip(),
-            transforms.RandomCrop(32, 4),
-            transforms.ToTensor(),
-            normalize,
-        ]), download=True)    
+    
+    if args.dataset == 'cifar10':
+        train_dataset = datasets.CIFAR10(root='./data', train=True, transform=transforms.Compose([
+                transforms.RandomHorizontalFlip(),
+                transforms.RandomCrop(32, 4),
+                transforms.ToTensor(),
+                normalize,
+            ]), download=True)
+    else:
+        train_dataset = datasets.CIFAR100(root='./data', train=True, transform=transforms.Compose([
+                transforms.RandomHorizontalFlip(),
+                transforms.RandomCrop(32, 4),
+                transforms.ToTensor(),
+                normalize,
+            ]), download=True)
 
     if args.distributed:
         train_sampler = torch.utils.data.distributed.DistributedSampler(train_dataset)
@@ -261,14 +277,23 @@ def main_worker(gpu, ngpus_per_node, args):
         train_dataset,
         batch_size=args.batch_size, shuffle=(train_sampler is None),
         num_workers=args.workers, pin_memory=True, sampler=train_sampler)
-
-    val_loader = torch.utils.data.DataLoader(
-        datasets.CIFAR10(root='./data', train=False, transform=transforms.Compose([
-            transforms.ToTensor(),
-            normalize,
-        ])),
-        batch_size=args.batch_size, shuffle=False,
-        num_workers=args.workers, pin_memory=True)
+    
+    if args.dataset == 'cifar10':
+        val_loader = torch.utils.data.DataLoader(
+            datasets.CIFAR10(root='./data', train=False, transform=transforms.Compose([
+                transforms.ToTensor(),
+                normalize,
+            ])),
+            batch_size=args.batch_size, shuffle=False,
+            num_workers=args.workers, pin_memory=True)
+    else:
+        val_loader = torch.utils.data.DataLoader(
+            datasets.CIFAR100(root='./data', train=False, transform=transforms.Compose([
+                transforms.ToTensor(),
+                normalize,
+            ])),
+            batch_size=args.batch_size, shuffle=False,
+            num_workers=args.workers, pin_memory=True)    
                   
     if args.evaluate:
         validate(val_loader, model, criterion, args)
