@@ -5,8 +5,7 @@ import math
 
 import torch.nn as nn
 import torch.nn.init as init
-from iea import Conv2d_iea
-from iea import Linear_iea
+from ien.ien import Conv2d_ien, Linear_ien
 
 __all__ = [
     'VGG', 'vgg11', 'vgg11_bn', 'vgg13', 'vgg13_bn', 'vgg16', 'vgg16_bn',
@@ -23,12 +22,12 @@ class VGG(nn.Module):
         self.features = features
         self.classifier = nn.Sequential(
             nn.Dropout(),
-            Linear_iea(512, 512, m=m),
+            Linear_ien(512, 512, m=m),
             nn.ReLU(True),
             nn.Dropout(),
-            Linear_iea(512, 512, m=m),
+            Linear_ien(512, 512, m=m),
             nn.ReLU(True),
-            Linear_iea(512, 10, m=m),
+            Linear_ien(512, 10, m=m),
         )
          # Initialize weights
         #for m in self.modules():
@@ -45,14 +44,14 @@ class VGG(nn.Module):
         return x
 
 
-def make_layers(cfg, batch_norm=False, m):
+def make_layers(cfg, m, batch_norm=False):
     layers = []
     in_channels = 3
     for v in cfg:
         if v == 'M':
             layers += [nn.MaxPool2d(kernel_size=2, stride=2)]
         else:
-            conv2d = Conv2d_iea(in_channels, v, kernel_size=3, padding=1, m=m)
+            conv2d = Conv2d_ien(in_channels, v, kernel_size=3, padding=1, m=m)
             if batch_norm:
                 layers += [conv2d, nn.BatchNorm2d(v), nn.ReLU(inplace=True)]
             else:

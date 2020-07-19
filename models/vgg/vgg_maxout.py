@@ -5,7 +5,8 @@ import math
 
 import torch.nn as nn
 import torch.nn.init as init
-from iea import Conv2d_maxout
+import ien.ien
+from ien.ien import Conv2d_maxout
 
 __all__ = [
     'VGG', 'vgg11', 'vgg11_bn', 'vgg13', 'vgg13_bn', 'vgg16', 'vgg16_bn',
@@ -44,7 +45,7 @@ class VGG(nn.Module):
         return x
 
 
-def make_layers(cfg, batch_norm=False, m):
+def make_layers(cfg, m, batch_norm=False):
     layers = []
     in_channels = 3
     for v in cfg:

@@ -5,7 +5,7 @@ import math
 
 import torch.nn as nn
 import torch.nn.init as init
-from iea import Conv2d_iea
+from ien.ien import Conv2d_ien
 
 __all__ = [
     'VGG', 'vgg11', 'vgg11_bn', 'vgg13', 'vgg13_bn', 'vgg16', 'vgg16_bn',
@@ -44,14 +44,14 @@ class VGG(nn.Module):
         return x
 
 
-def make_layers(cfg, batch_norm=False, m):
+def make_layers(cfg, m, batch_norm=False):
     layers = []
     in_channels = 3
     for v in cfg:
         if v == 'M':
             layers += [nn.MaxPool2d(kernel_size=2, stride=2)]
         else:
-            conv2d = Conv2d_iea(in_channels, v, kernel_size=3, padding=1, m=m)
+            conv2d = Conv2d_ien(in_channels, v, kernel_size=3, padding=1, m=m)
             if batch_norm:
                 layers += [conv2d, nn.BatchNorm2d(v), nn.ReLU(inplace=True)]
             else:
