@@ -18,7 +18,7 @@ import torchvision.transforms as transforms
 import torchvision.datasets as datasets
 import pickle
 
-variation_names = ['base', 'ien', 'maxout', 'fc']
+variation_names = ['normal', 'base', 'ien', 'maxout', 'fc', 'drop', 'drop_ien', 'ien_nn' ]
 
 parser = argparse.ArgumentParser(description='PyTorch Cifar Training')
 parser.add_argument('--variation', default='base',
@@ -26,25 +26,46 @@ parser.add_argument('--variation', default='base',
                     help='variation: ' +
                         ' | '.join(variation_names) +
                         ' (default: base)')
-namespace, extra = parser.parse_known_args()
-if namespace.variation == 'base':
-    import vgg as models
-elif namespace.variation == 'ien':
-    import vgg_iea as models
-elif namespace.variation == 'maxout':
-    import vgg_maxout as models
-elif namespace.variation == 'fc':
-    import vgg_fc as models
-
-model_names = sorted(name for name in models.__dict__
-    if name.islower() and not name.startswith("__")
-    and callable(models.__dict__[name]))
 
 parser.add_argument('-a', '--arch', metavar='ARCH', default='vgg16_bn',
-                    choices=model_names,
-                    help='model architecture: ' +
-                        ' | '.join(model_names) +
-                        ' (default: vgg16_bn)')
+                    help='model architecture')
+namespace, extra = parser.parse_known_args()
+
+if "vgg" in namespace.arch:
+    if namespace.variation == 'normal':
+        import models.vgg.vgg as models
+    elif namespace.variation == 'ien':
+        import models.vgg.vgg_iea as models
+    elif namespace.variation == 'maxout':
+        import models.vgg.vgg_maxout as models
+    elif namespace.variation == 'fc':
+        import models.vgg.vgg_fc as models
+elif "resnet" in namespace.arch:
+    if namespace.variation == "normal":
+        import models.resnet.resnet as models
+    elif namespace.variation == "ien":
+        import models.resnet.resnet_iea  as models
+    elif namespace.variation == "maxout":
+        import models.resnet.resnet_maxout  as models
+    elif namespace.variation == "base":
+        import models.resnet.resnet_base as models
+    elif namespace.variation == "drop":
+        import models.resnet.resnet_drop as models
+    elif namespace.variation == "drop_ien":
+        import models.resnet.resnet_drop_iea as models
+    elif namespace.variation == "ien_nn":
+        import models.resnet.resnet_iea_nn as models
+    
+
+#model_names = sorted(name for name in models.__dict__
+#    if name.islower() and not name.startswith("__")
+#    and callable(models.__dict__[name]))
+
+#parser.add_argument('-a', '--arch', metavar='ARCH', default='vgg16_bn',
+#                    choices=model_names,
+#                    help='model architecture: ' +
+#                        ' | '.join(model_names) +
+#                        ' (default: vgg16_bn)')
 parser.add_argument('-j', '--workers', default=4, type=int, metavar='N',
                     help='number of data loading workers (default: 4)')
 parser.add_argument('--epochs', default=300, type=int, metavar='N',
@@ -133,7 +154,9 @@ def main():
 
     args.distributed = args.world_size > 1 or args.multiprocessing_distributed
     #Save args
-    with open(os.path.join(args.save_dir,'{}_{}_args_ver_{}.pkl'.format(args.arch, args.variation, args.version)), 'wb') as f:
+    if args.variation == 'normal' or args.variation == 'drop':
+        args.Mense = 1
+    with open(os.path.join(args.save_dir,'{}_{}_args_ver_{}_m_{}.pkl'.format(args.arch, args.variation, args.version, args.Mense)), 'wb') as f:
         pickle.dump(args, f)
         
     ngpus_per_node = torch.cuda.device_count()
@@ -171,10 +194,16 @@ def main_worker(gpu, ngpus_per_node, args):
         model = models.__dict__[args.arch](pretrained=True)
     else:
         print("=> creating model '{}'".format(args.arch))
-        if args.variation == 'base':
-            model = models.__dict__[args.arch](args.dataset)
+        if args.variation == 'normal' or args.variation == 'drop':
+            if (args.dataset == 'cifar10'):
+                model = models.__dict__[args.arch](num_classes = 10)
+            else:
+                model = models.__dict__[args.arch](num_classes = 100)
         else:
-            model = models.__dict__[args.arch](args.Mense, args.dataset)
+            if (args.dataset == 'cifar10'):
+                model = models.__dict__[args.arch](args.Mense, num_classes = 10)
+            else:
+                model = models.__dict__[args.arch](args.Mense, num_classes = 100)
     #parameter count
     #import numpy as np
     #model_parameters = filter(lambda p: p.requires_grad, model.parameters())
@@ -306,7 +335,7 @@ def main_worker(gpu, ngpus_per_node, args):
             bias_dict = {}
             #populate weight and bias dicts from 3 normal models
             for version in [0,1,2]:
-                bestpath = os.path.join(args.save_dir, '{}_{}_model_best_ver_{}.pth.tar'.format(args.arch, args.variation, version))
+                bestpath = os.path.join(args.save_dir, '{}_{}_model_best_ver_{}_m_{}.pth.tar'.format(args.arch, args.variation, version, args.Mense))
                 #bestpath = args.arch+'_model_best.pth.tar'
                 print("=> loading bestpoint '{}'".format(bestpath))
                 if args.gpu is None:
@@ -355,7 +384,7 @@ def main_worker(gpu, ngpus_per_node, args):
 
 
         else:
-            bestpath = os.path.join(args.save_dir, '{}_{}_model_best_ver_{}.pth.tar'.format(args.arch, args.variation, args.version))
+            bestpath = os.path.join(args.save_dir, '{}_{}_model_best_ver_{}_m_{}.pth.tar'.format(args.arch, args.variation, args.version, args.Mense))
             #bestpath = args.arch+'_model_best.pth.tar'
             print("=> loading bestpoint '{}'".format(bestpath))
             if args.gpu is None:
@@ -401,10 +430,10 @@ def main_worker(gpu, ngpus_per_node, args):
                 'state_dict': model.state_dict(),
                 'best_acc1': best_acc1,
                 'optimizer' : optimizer.state_dict(),
-            }, is_best, filename=os.path.join(args.save_dir, '{}_{}_checkpoint_ver_{}.pth.tar'.format(args.arch, args.variation, args.version)),
-            bestname=os.path.join(args.save_dir, '{}_{}_model_best_ver_{}.pth.tar'.format(args.arch, args.variation, args.version)))
+            }, is_best, filename=os.path.join(args.save_dir, '{}_{}_checkpoint_ver_{}_m_{}.pth.tar'.format(args.arch, args.variation, args.version, args.Mense)),
+            bestname=os.path.join(args.save_dir, '{}_{}_model_best_ver_{}_m_{}.pth.tar'.format(args.arch, args.variation, args.version, args.Mense)))
             #Keep track of number of epochs completed in external text file
-            f = open(os.path.join(args.save_dir,'{}_{}_epochs_ver_{}.txt'.format(args.arch, args.variation, args.version)), 'w')
+            f = open(os.path.join(args.save_dir,'{}_{}_epochs_ver_{}_m_{}.txt'.format(args.arch, args.variation, args.version, args.Mense)), 'w')
             f.write( 'Number of epochs completed = ' + repr(epoch+1) + '\n' )
             f.close()
 

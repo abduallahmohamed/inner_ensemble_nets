@@ -16,7 +16,7 @@ class VGG(nn.Module):
     '''
     VGG model 
     '''
-    def __init__(self, features, dataset):
+    def __init__(self, features, num_classes=10):
         super(VGG, self).__init__()
         self.features = features
         self.classifier = nn.Sequential(
@@ -26,7 +26,7 @@ class VGG(nn.Module):
             nn.Dropout(),
             nn.Linear(512, 512),
             nn.ReLU(True),
-            nn.Linear(512, 10) if dataset=='cifar10' else nn.Linear(512, 100),
+            nn.Linear(512, num_classes),
         )
          # Initialize weights
         for m in self.modules():
@@ -68,41 +68,41 @@ cfg = {
 }
 
 
-def vgg11(dataset):
+def vgg11(num_classes):
     """VGG 11-layer model (configuration "A")"""
-    return VGG(make_layers(cfg['A']), dataset)
+    return VGG(make_layers(cfg['A']), num_classes=num_classes)
 
 
-def vgg11_bn(dataset):
+def vgg11_bn(num_classes):
     """VGG 11-layer model (configuration "A") with batch normalization"""
-    return VGG(make_layers(cfg['A'], batch_norm=True), dataset)
+    return VGG(make_layers(cfg['A'], batch_norm=True), num_classes=num_classes)
 
 
-def vgg13(dataset):
+def vgg13(num_classes):
     """VGG 13-layer model (configuration "B")"""
-    return VGG(make_layers(cfg['B']), dataset)
+    return VGG(make_layers(cfg['B']), num_classes=num_classes)
 
 
-def vgg13_bn(dataset):
+def vgg13_bn(num_classes):
     """VGG 13-layer model (configuration "B") with batch normalization"""
-    return VGG(make_layers(cfg['B'], batch_norm=True), dataset)
+    return VGG(make_layers(cfg['B'], batch_norm=True), num_classes=num_classes)
 
 
-def vgg16(dataset):
+def vgg16(num_classes):
     """VGG 16-layer model (configuration "D")"""
-    return VGG(make_layers(cfg['D']), dataset)
+    return VGG(make_layers(cfg['D']), num_classes=num_classes)
 
 
-def vgg16_bn(dataset):
+def vgg16_bn(num_classes):
     """VGG 16-layer model (configuration "D") with batch normalization"""
-    return VGG(make_layers(cfg['D'], batch_norm=True), dataset)
+    return VGG(make_layers(cfg['D'], batch_norm=True), num_classes=num_classes)
 
 
-def vgg19(dataset):
+def vgg19(num_classes):
     """VGG 19-layer model (configuration "E")"""
-    return VGG(make_layers(cfg['E']), dataset)
+    return VGG(make_layers(cfg['E']), num_classes=num_classes)
 
 
-def vgg19_bn(dataset):
+def vgg19_bn(num_classes):
     """VGG 19-layer model (configuration 'E') with batch normalization"""
-    return VGG(make_layers(cfg['E'], batch_norm=True), dataset)
+    return VGG(make_layers(cfg['E'], batch_norm=True), num_classes=num_classes)
