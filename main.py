@@ -56,16 +56,6 @@ elif "resnet" in namespace.arch:
     elif namespace.variation == "ien_nn":
         import models.resnet.resnet_iea_nn as models
     
-
-#model_names = sorted(name for name in models.__dict__
-#    if name.islower() and not name.startswith("__")
-#    and callable(models.__dict__[name]))
-
-#parser.add_argument('-a', '--arch', metavar='ARCH', default='vgg16_bn',
-#                    choices=model_names,
-#                    help='model architecture: ' +
-#                        ' | '.join(model_names) +
-#                        ' (default: vgg16_bn)')
 parser.add_argument('-j', '--workers', default=4, type=int, metavar='N',
                     help='number of data loading workers (default: 4)')
 parser.add_argument('--epochs', default=300, type=int, metavar='N',
@@ -153,9 +143,14 @@ def main():
         args.world_size = int(os.environ["WORLD_SIZE"])
 
     args.distributed = args.world_size > 1 or args.multiprocessing_distributed
-    #Save args
+    
+    #Need to change Mense from the default value of 4 to 1 if not ensembling
     if args.variation == 'normal' or args.variation == 'drop':
         args.Mense = 1
+    # Check the save_dir exists or not
+    if not os.path.exists(args.save_dir):
+        os.makedirs(args.save_dir)
+    #Save args
     with open(os.path.join(args.save_dir,'{}_{}_args_ver_{}_m_{}.pkl'.format(args.arch, args.variation, args.version, args.Mense)), 'wb') as f:
         pickle.dump(args, f)
         
@@ -323,7 +318,21 @@ def main_worker(gpu, ngpus_per_node, args):
             ])),
             batch_size=args.batch_size, shuffle=False,
             num_workers=args.workers, pin_memory=True)    
-                  
+    
+    if "resnet" in args.arch:
+        lr_scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer,
+                                                            milestones=[100, 150], last_epoch=-1)
+        if args.start_epoch >0:
+            for i in range(args.start_epoch):
+                lr_scheduler.step()
+
+
+        if 'resnet1202' in args.arch or 'resnet110' in  args.arch:
+            # for resnet1202 original paper uses lr=0.01 for first 400 minibatches for warm-up
+            # then switch back. In this setup it will correspond for first epoch.
+            for param_group in optimizer.param_groups:
+                param_group['lr'] = args.lr*0.1
+            
     if args.evaluate:
         validate(val_loader, model, criterion, args)
         return
@@ -412,10 +421,16 @@ def main_worker(gpu, ngpus_per_node, args):
     for epoch in range(args.start_epoch, args.epochs):
         if args.distributed:
             train_sampler.set_epoch(epoch)
-        adjust_learning_rate(optimizer, epoch, args)
+            
+        if "vgg" in args.arch:
+            adjust_learning_rate(optimizer, epoch, args)
 
         # train for one epoch
         train(train_loader, model, criterion, optimizer, epoch, args)
+        
+        if "resnet" in args.arch:
+            lr_scheduler.step()
+            
         # evaluate on validation set
         acc1 = validate(val_loader, model, criterion, args)
         # remember best acc@1 and save checkpoint
