@@ -339,7 +339,7 @@ def main_worker(gpu, ngpus_per_node, args):
 
     #Pruning
     if args.prune:
-        if args.variation == 'base':
+        if args.variation == 'normal':
             weights_dict = {}
             bias_dict = {}
             #populate weight and bias dicts from 3 normal models
