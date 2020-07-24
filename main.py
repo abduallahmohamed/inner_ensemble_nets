@@ -35,7 +35,7 @@ if "vgg" in namespace.arch:
     if namespace.variation == 'normal':
         import models.vgg.vgg as models
     elif namespace.variation == 'ien':
-        import models.vgg.vgg_iea as models
+        import models.vgg.vgg_ien as models
     elif namespace.variation == 'maxout':
         import models.vgg.vgg_maxout as models
     elif namespace.variation == 'fc':
@@ -44,7 +44,7 @@ elif "resnet" in namespace.arch:
     if namespace.variation == "normal":
         import models.resnet.resnet as models
     elif namespace.variation == "ien":
-        import models.resnet.resnet_iea  as models
+        import models.resnet.resnet_ien  as models
     elif namespace.variation == "maxout":
         import models.resnet.resnet_maxout  as models
     elif namespace.variation == "base":
@@ -52,9 +52,9 @@ elif "resnet" in namespace.arch:
     elif namespace.variation == "drop":
         import models.resnet.resnet_drop as models
     elif namespace.variation == "drop_ien":
-        import models.resnet.resnet_drop_iea as models
+        import models.resnet.resnet_drop_ien as models
     elif namespace.variation == "ien_nn":
-        import models.resnet.resnet_iea_nn as models
+        import models.resnet.resnet_ien_nn as models
     
 parser.add_argument('-j', '--workers', default=4, type=int, metavar='N',
                     help='number of data loading workers (default: 4)')
