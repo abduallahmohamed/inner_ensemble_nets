@@ -143,43 +143,95 @@ def train(model, train_set, valid_set, test_set, save, n_epochs=300,
         model = model.cuda()
     
     if prune:
-        # Final test of model on test set
-        model.load_state_dict(torch.load(os.path.join(save, 'model.th'))['state_dict'])
-        model.cuda()
-        # if torch.cuda.is_available() and torch.cuda.device_count() > 1:
-            # model = torch.nn.DataParallel(model).cuda()
-        test_results = test_epoch(
-            model=model,
-            loader=test_loader,
-            is_test=True
-        )
-        _, _, test_error = test_results
-        with open(os.path.join(save, 'noprune.txt'), 'w') as f:
-            f.write('%0.5f\n' % (test_error))
-            f.close()
-        print('Final test error: %.4f' % test_error)
+        if model_type=='normal': #do fusion of normal models
+            weights_dict = {}
+            bias_dict = {}
+            bmodel = None
+            print(save)
+            #populate weight and bias dicts from 4 normal models
+            for d in [0,1,2,3]:
+                model.load_state_dict(torch.load(os.path.join(save, 'model.th'))['state_dict'])
+                # model.cuda()
+                for id,module in enumerate(model.modules()):
+                    if(type(module) == nn.Conv2d or type(module) == nn.Linear ):
+                        if id in weights_dict:
+                            weights_dict[id].append(module.weight.data.clone())
+                            if module.bias is not None:
+                                bias_dict[id].append(module.bias.data.clone())
+                        else:
+                            weights_dict[id]=[]
+                            bias_dict[id]=[]
+                            weights_dict[id].append(module.weight.data.clone())
+                            if module.bias is not None:
+                                bias_dict[id].append(module.bias.data.clone())
+            #create the target model by fusing the weights and bias dicts into a single model
+            for id,module in enumerate(model.modules()):
+                if(type(module) == nn.Conv2d or type(module) == nn.Linear ):
 
-        if model_type != "normal":
+                    var_inv_sum = 0
+                    for i in range(4):
+                        var_inv_sum +=  1/weights_dict[id][i].var()
 
-            cnt_=0
-            for m in model.modules():
-                if hasattr(m, "domms"):
-                    # print("Apply inv variance")
-                    m.domms = False
-                    m.apply_weights_pruning()
-                    cnt_+=1
-            print("CNT:",cnt_)
+                    module.weight.data.fill_(0)               
+                    for i in range(4):
+                        vrinv = (1/weights_dict[id][i].var())/var_inv_sum
+                        module.weight.data+= vrinv*weights_dict[id][i]
 
+                    if module.bias is not None:
+                        module.bias.data.fill_(0)
+                        for i in range(4):
+                            vrinv = (1/weights_dict[id][i].var())/var_inv_sum
+                            module.bias.data+= vrinv*bias_dict[id][i]
+                            
             test_results = test_epoch(
                 model=model,
                 loader=test_loader,
                 is_test=True
             )
             _, _, test_error = test_results
-            with open(os.path.join(save, 'prune.txt'), 'w') as f:
+            with open(os.path.join(save, 'fused.txt'), 'w') as f:
                 f.write('%0.5f\n' % (test_error))
                 f.close()
-            print('Final test error pruning: %.4f' % test_error)
+            print('Final test error: %.4f' % test_error)
+        
+        else:
+            # Final test of model on test set
+            model.load_state_dict(torch.load(os.path.join(save, 'model.th'))['state_dict'])
+            model.cuda()
+            # if torch.cuda.is_available() and torch.cuda.device_count() > 1:
+                # model = torch.nn.DataParallel(model).cuda()
+            test_results = test_epoch(
+                model=model,
+                loader=test_loader,
+                is_test=True
+            )
+            _, _, test_error = test_results
+            with open(os.path.join(save, 'noprune.txt'), 'w') as f:
+                f.write('%0.5f\n' % (test_error))
+                f.close()
+            print('Final test error: %.4f' % test_error)
+
+            if model_type != "normal":
+
+                cnt_=0
+                for m in model.modules():
+                    if hasattr(m, "domms"):
+                        # print("Apply inv variance")
+                        m.domms = False
+                        m.apply_weights_pruning()
+                        cnt_+=1
+                print("CNT:",cnt_)
+
+                test_results = test_epoch(
+                    model=model,
+                    loader=test_loader,
+                    is_test=True
+                )
+                _, _, test_error = test_results
+                with open(os.path.join(save, 'prune.txt'), 'w') as f:
+                    f.write('%0.5f\n' % (test_error))
+                    f.close()
+                print('Final test error pruning: %.4f' % test_error)
     else:
     # Wrap model for multi-GPUs, if necessary
         model_wrapper = model
