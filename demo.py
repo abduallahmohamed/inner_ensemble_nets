@@ -121,7 +121,7 @@ def test_epoch(model, loader, print_freq=1, is_test=True):
 
 
 def train(model, train_set, valid_set, test_set, save, n_epochs=300,
-          batch_size=64, lr=0.1, wd=0.0001, momentum=0.9, seed=None):
+          batch_size=64, lr=0.1, wd=0.0001, momentum=0.9, seed=None, model_type="", prune=False):
     if seed is not None:
         torch.manual_seed(seed)
 
@@ -141,123 +141,162 @@ def train(model, train_set, valid_set, test_set, save, n_epochs=300,
     # Model on cuda
     if torch.cuda.is_available():
         model = model.cuda()
+    
+    if prune:
+        # Final test of model on test set
+        model.load_state_dict(torch.load(os.path.join(save, 'model.th'))['state_dict'])
+        model.cuda()
+        # if torch.cuda.is_available() and torch.cuda.device_count() > 1:
+            # model = torch.nn.DataParallel(model).cuda()
+        test_results = test_epoch(
+            model=model,
+            loader=test_loader,
+            is_test=True
+        )
+        _, _, test_error = test_results
+        with open(os.path.join(save, 'noprune.txt'), 'w') as f:
+            f.write('%0.5f\n' % (test_error))
+            f.close()
+        print('Final test error: %.4f' % test_error)
 
-    # Wrap model for multi-GPUs, if necessary
-    model_wrapper = model
-    if torch.cuda.is_available() and torch.cuda.device_count() > 1:
-        model_wrapper = torch.nn.DataParallel(model).cuda()
+        if model_type != "normal":
 
-    # Optimizer
-    optimizer = torch.optim.SGD(model_wrapper.parameters(), lr=lr, momentum=momentum, nesterov=True, weight_decay=wd)
-    scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[0.5 * n_epochs, 0.75 * n_epochs],
-                                                     gamma=0.1, last_epoch=-1)
-                                                     
-    # optionally resume from a checkpoint
-    if os.path.exists(os.path.join(save, 'epoch.txt')):
-            
-        print("=> loading checkpoint '{}'".format(os.path.join(save, 'chk.th')))
-        checkpoint = torch.load(os.path.join(save, 'model.th'))
-        start_epoch = checkpoint['epoch']
-        best_error = checkpoint['best_error']
-        model.load_state_dict(checkpoint['state_dict'])
-        print("=> loaded checkpoint '{}' (epoch {})"
-              .format(os.path.join(save, 'model.th'), checkpoint['epoch']))
+            cnt_=0
+            for m in model.modules():
+                if hasattr(m, "domms"):
+                    # print("Apply inv variance")
+                    m.domms = False
+                    m.apply_weights_pruning()
+                    cnt_+=1
+            print("CNT:",cnt_)
+
+            test_results = test_epoch(
+                model=model,
+                loader=test_loader,
+                is_test=True
+            )
+            _, _, test_error = test_results
+            with open(os.path.join(save, 'prune.txt'), 'w') as f:
+                f.write('%0.5f\n' % (test_error))
+                f.close()
+            print('Final test error pruning: %.4f' % test_error)
     else:
-        print("=> no checkpoint found at '{}'".format(os.path.join(save, 'chk.th')))                                             
-        # Train model
-        best_error = 1
-        start_epoch = 0
+    # Wrap model for multi-GPUs, if necessary
+        model_wrapper = model
+        if torch.cuda.is_available() and torch.cuda.device_count() > 1:
+            model_wrapper = torch.nn.DataParallel(model).cuda()
 
-    # Start log
-    with open(os.path.join(save, 'results.csv'), 'w') as f:
-        f.write('epoch,train_loss,train_error,valid_loss,valid_error,test_error\n')
-    if start_epoch >0:
-        for i in range(start_epoch):
+        # Optimizer
+        optimizer = torch.optim.SGD(model_wrapper.parameters(), lr=lr, momentum=momentum, nesterov=True, weight_decay=wd)
+        scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[0.5 * n_epochs, 0.75 * n_epochs],
+                                                         gamma=0.1, last_epoch=-1)
+
+        # optionally resume from a checkpoint
+        if os.path.exists(os.path.join(save, 'epoch.txt')):
+
+            print("=> loading checkpoint '{}'".format(os.path.join(save, 'chk.th')))
+            checkpoint = torch.load(os.path.join(save, 'model.th'))
+            start_epoch = checkpoint['epoch']
+            best_error = checkpoint['best_error']
+            model.load_state_dict(checkpoint['state_dict'])
+            print("=> loaded checkpoint '{}' (epoch {})"
+                  .format(os.path.join(save, 'model.th'), checkpoint['epoch']))
+        else:
+            print("=> no checkpoint found at '{}'".format(os.path.join(save, 'chk.th')))                                             
+            # Train model
+            best_error = 1
+            start_epoch = 0
+
+        # Start log
+        with open(os.path.join(save, 'results.csv'), 'w') as f:
+            f.write('epoch,train_loss,train_error,valid_loss,valid_error,test_error\n')
+        if start_epoch >0:
+            for i in range(start_epoch):
+                scheduler.step()
+
+        for epoch in range(start_epoch,n_epochs):
+            _, train_loss, train_error = train_epoch(
+                model=model_wrapper,
+                loader=train_loader,
+                optimizer=optimizer,
+                epoch=epoch,
+                n_epochs=n_epochs,
+            )
             scheduler.step()
+            _, valid_loss, valid_error = test_epoch(
+                model=model_wrapper,
+                loader=valid_loader if valid_loader else test_loader,
+                is_test=(not valid_loader)
+            )
 
-    for epoch in range(start_epoch,n_epochs):
-        _, train_loss, train_error = train_epoch(
-            model=model_wrapper,
-            loader=train_loader,
-            optimizer=optimizer,
-            epoch=epoch,
-            n_epochs=n_epochs,
-        )
-        scheduler.step()
-        _, valid_loss, valid_error = test_epoch(
-            model=model_wrapper,
-            loader=valid_loader if valid_loader else test_loader,
-            is_test=(not valid_loader)
-        )
 
-        
-        # Determine if model is the best
-        if valid_loader:
-            if valid_error < best_error:
-                best_error = valid_error
-                print('New best error: %.4f' % best_error)
+            # Determine if model is the best
+            if valid_loader:
+                if valid_error < best_error:
+                    best_error = valid_error
+                    print('New best error: %.4f' % best_error)
+                    # torch.save(model.state_dict(), os.path.join(save, 'model.dat'))
+                    torch.save({
+                    'state_dict': model.state_dict(),
+                    'best_error': best_error,
+                    'best_loss':valid_loss,
+                    'epoch': epoch + 1,
+                    } ,os.path.join(save, 'model.th'))
+            # else:
                 # torch.save(model.state_dict(), os.path.join(save, 'model.dat'))
-                torch.save({
-                'state_dict': model.state_dict(),
-                'best_error': best_error,
-                'best_loss':valid_loss,
-                'epoch': epoch + 1,
-                } ,os.path.join(save, 'model.th'))
-        # else:
-            # torch.save(model.state_dict(), os.path.join(save, 'model.dat'))
 
-        # Log results
+            # Log results
+            with open(os.path.join(save, 'results.csv'), 'a') as f:
+                f.write('%03d,%0.6f,%0.6f,%0.5f,%0.5f,\n' % (
+                    (epoch + 1),
+                    train_loss,
+                    train_error,
+                    valid_loss,
+                    valid_error,
+                ))
+
+            if os.path.exists(os.path.join(save, 'train_log.txt')):
+                append_write = 'a' # append if already exists
+            else:
+                append_write = 'w' # make a new file if not
+            highscore = open(os.path.join(save, 'train_log.txt'),append_write)
+            highscore.write(str(train_loss)+"\t"+str(train_error) + '\n')
+            highscore.close()
+
+            if os.path.exists(os.path.join(save, 'test_log.txt')):
+                append_write = 'a' # append if already exists
+            else:
+                append_write = 'w' # make a new file if not
+            highscore = open(os.path.join(save, 'test_log.txt'),append_write)
+            highscore.write(str(valid_loss)+"\t"+str(valid_error) + '\n')
+            highscore.close()
+
+            torch.save({
+            'state_dict': model.state_dict(),
+            'best_error': best_error,
+            'best_loss':valid_loss,
+            'epoch': epoch + 1,
+            } ,os.path.join(save, 'chk.th'))
+            with open(os.path.join(save, 'epoch.txt'), 'w') as handle:
+                handle.write(str(epoch))
+
+        # Final test of model on test set
+        model.load_state_dict(torch.load(os.path.join(save, 'model.th'))['state_dict'])
+        if torch.cuda.is_available() and torch.cuda.device_count() > 1:
+            model = torch.nn.DataParallel(model).cuda()
+        test_results = test_epoch(
+            model=model,
+            loader=test_loader,
+            is_test=True
+        )
+        _, _, test_error = test_results
         with open(os.path.join(save, 'results.csv'), 'a') as f:
-            f.write('%03d,%0.6f,%0.6f,%0.5f,%0.5f,\n' % (
-                (epoch + 1),
-                train_loss,
-                train_error,
-                valid_loss,
-                valid_error,
-            ))
-
-        if os.path.exists(os.path.join(save, 'train_log.txt')):
-            append_write = 'a' # append if already exists
-        else:
-            append_write = 'w' # make a new file if not
-        highscore = open(os.path.join(save, 'train_log.txt'),append_write)
-        highscore.write(str(train_loss)+"\t"+str(train_error) + '\n')
-        highscore.close()
-        
-        if os.path.exists(os.path.join(save, 'test_log.txt')):
-            append_write = 'a' # append if already exists
-        else:
-            append_write = 'w' # make a new file if not
-        highscore = open(os.path.join(save, 'test_log.txt'),append_write)
-        highscore.write(str(valid_loss)+"\t"+str(valid_error) + '\n')
-        highscore.close()
-        
-        torch.save({
-        'state_dict': model.state_dict(),
-        'best_error': best_error,
-        'best_loss':valid_loss,
-        'epoch': epoch + 1,
-        } ,os.path.join(save, 'chk.th'))
-        with open(os.path.join(save, 'epoch.txt'), 'w') as handle:
-            handle.write(str(epoch))
-        
-    # Final test of model on test set
-    model.load_state_dict(torch.load(os.path.join(save, 'model.th'))['state_dict'])
-    if torch.cuda.is_available() and torch.cuda.device_count() > 1:
-        model = torch.nn.DataParallel(model).cuda()
-    test_results = test_epoch(
-        model=model,
-        loader=test_loader,
-        is_test=True
-    )
-    _, _, test_error = test_results
-    with open(os.path.join(save, 'results.csv'), 'a') as f:
-        f.write(',,,,,%0.5f\n' % (test_error))
-    print('Final test error: %.4f' % test_error)
+            f.write(',,,,,%0.5f\n' % (test_error))
+        print('Final test error: %.4f' % test_error)
 
 
 def demo(data, save, depth=100, growth_rate=12, efficient=True, valid_size=5000,
-         n_epochs=300, batch_size=64, seed=None,model_type="", dataset='cifar10',Mense=4):
+         n_epochs=300, batch_size=64, seed=None,model_type="", dataset='cifar10',Mense=4, prune=False):
     """
     A demo to show off training of efficient DenseNets.
     Trains and evaluates a DenseNet-BC on CIFAR-10.
@@ -377,7 +416,7 @@ def demo(data, save, depth=100, growth_rate=12, efficient=True, valid_size=5000,
 
     # Train the model
     train(model=model, train_set=train_set, valid_set=valid_set, test_set=test_set, save=save,
-          n_epochs=n_epochs, batch_size=batch_size, seed=seed)
+          n_epochs=n_epochs, batch_size=batch_size, seed=seed, model_type=model_type, prune=prune)
     print('Done!')
 
 
