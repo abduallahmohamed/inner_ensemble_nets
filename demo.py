@@ -147,10 +147,11 @@ def train(model, train_set, valid_set, test_set, save, n_epochs=300,
             weights_dict = {}
             bias_dict = {}
             bmodel = None
+            save=save[:-1] #strip default version of 0 from save folder name
             print(save)
             #populate weight and bias dicts from 4 normal models
             for d in [0,1,2,3]:
-                model.load_state_dict(torch.load(os.path.join(save, 'model.th'))['state_dict'])
+                model.load_state_dict(torch.load(os.path.join(save+str(d), 'model.th'))['state_dict'])
                 # model.cuda()
                 for id,module in enumerate(model.modules()):
                     if(type(module) == nn.Conv2d or type(module) == nn.Linear ):
@@ -189,6 +190,10 @@ def train(model, train_set, valid_set, test_set, save, n_epochs=300,
                 is_test=True
             )
             _, _, test_error = test_results
+            
+            save+="fused" #create new folder for fused data
+            if not os.path.exists(save):
+                os.makedirs(save)
             with open(os.path.join(save, 'fused.txt'), 'w') as f:
                 f.write('%0.5f\n' % (test_error))
                 f.close()
@@ -211,27 +216,27 @@ def train(model, train_set, valid_set, test_set, save, n_epochs=300,
                 f.close()
             print('Final test error: %.4f' % test_error)
 
-            if model_type != "normal":
+            #if model_type != "normal":
 
-                cnt_=0
-                for m in model.modules():
-                    if hasattr(m, "domms"):
-                        # print("Apply inv variance")
-                        m.domms = False
-                        m.apply_weights_pruning()
-                        cnt_+=1
-                print("CNT:",cnt_)
+            cnt_=0
+            for m in model.modules():
+                if hasattr(m, "domms"):
+                    # print("Apply inv variance")
+                    m.domms = False
+                    m.apply_weights_pruning()
+                    cnt_+=1
+            print("CNT:",cnt_)
 
-                test_results = test_epoch(
-                    model=model,
-                    loader=test_loader,
-                    is_test=True
-                )
-                _, _, test_error = test_results
-                with open(os.path.join(save, 'prune.txt'), 'w') as f:
-                    f.write('%0.5f\n' % (test_error))
-                    f.close()
-                print('Final test error pruning: %.4f' % test_error)
+            test_results = test_epoch(
+                model=model,
+                loader=test_loader,
+                is_test=True
+            )
+            _, _, test_error = test_results
+            with open(os.path.join(save, 'prune.txt'), 'w') as f:
+                f.write('%0.5f\n' % (test_error))
+                f.close()
+            print('Final test error pruning: %.4f' % test_error)
     else:
     # Wrap model for multi-GPUs, if necessary
         model_wrapper = model
@@ -348,7 +353,7 @@ def train(model, train_set, valid_set, test_set, save, n_epochs=300,
 
 
 def demo(data, save, depth=100, growth_rate=12, efficient=True, valid_size=5000,
-         n_epochs=300, batch_size=64, seed=None,model_type="", dataset='cifar10',Mense=4, prune=False):
+         n_epochs=300, batch_size=64, seed=None, model_type="", dataset='cifar10', version=0, Mense=4, prune=False):
     """
     A demo to show off training of efficient DenseNets.
     Trains and evaluates a DenseNet-BC on CIFAR-10.
@@ -385,8 +390,8 @@ def demo(data, save, depth=100, growth_rate=12, efficient=True, valid_size=5000,
         from models.densenet.densenet_ien_nn import DenseNet 
         
     print(save)
-    save = save+"_"+str(growth_rate)+"_"+str(depth)+"_"+str(model_type)+"_"+str(seed)+"_"+str(Mense)+"_" 
-
+    #save = save+"_"+str(growth_rate)+"_"+str(depth)+"_"+str(model_type)+"_"+str(seed)+"_"+str(Mense)+"_" 
+    save=os.path.join(save, "densenet_"+str(growth_rate)+"_"+str(depth)+"_"+str(model_type)+"_"+str(seed)+"_"+str(Mense)+"_"+str(version))
 
     # Get densenet configuration
     if (depth - 4) % 3:
