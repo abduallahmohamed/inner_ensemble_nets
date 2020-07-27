@@ -3,7 +3,7 @@ import os
 import time
 import torch
 from torchvision import datasets, transforms
-
+import torch.nn as nn
 
 class AverageMeter(object):
     """
@@ -454,7 +454,7 @@ def demo(data, save, depth=100, growth_rate=12, efficient=True, valid_size=5000,
             small_inputs=True,
             efficient=efficient,M=Mense
         )
-    print(model)
+    #print(model)
     
     # Print number of parameters
     num_params = sum(p.numel() for p in model.parameters())
@@ -491,8 +491,8 @@ Other args:
     --model_type - normal ien maxout ien_nn
     --Mense - Number of ensembles
 """
-#CUDA_VISIBLE_DEVICES=0 python demo.py --data ./tds --depth 40 --growth_rate 12 --seed 9999 --model_type normal --Mense 4 --save ./testX --efficient True 
+#CUDA_VISIBLE_DEVICES=0 python demo.py --data ./data --depth 40 --growth_rate 12 --seed 9999 --model_type normal --Mense 4 --save ./testX --efficient True 
 
-#CUDA_VISIBLE_DEVICES=0 python  demo.py --data ./tds --depth 100 --growth_rate 12 --seed 9999 --model_type maxout --Mense 4 --save ./testX --efficient True 
+#CUDA_VISIBLE_DEVICES=0 python  demo.py --data ./data --depth 100 --growth_rate 12 --seed 9999 --model_type maxout --Mense 4 --save ./testX --efficient True 
 if __name__ == '__main__':
     fire.Fire(demo)
