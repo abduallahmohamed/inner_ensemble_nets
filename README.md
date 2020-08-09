@@ -17,7 +17,7 @@ Our results show a decrease of error rates between 1.7\% and 17.3\% in compariso
 ## Using IENs 
 You can have IENs installed as a pip test package using the following command: 
 ```bash
-python3 -m pip install --index-url https://test.pypi.org/simple/ --no-deps inner-ensemble-nets=0.0.2
+python3 -m pip install --index-url https://test.pypi.org/simple/ --no-deps inner-ensemble-nets==0.0.2
 ```
 
 In your code import it as the following: 
