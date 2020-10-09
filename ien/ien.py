@@ -76,7 +76,7 @@ class Conv2d_ien(nn.Module):
         if self.bias:
             self.subcnn.bias.data.fill_(0)
         for bkey in range(self.m):
-            vrinv = (1/self.mms[bkey].weight[:,:,:,:].var())/var_inv_sum
+            vrinv = 1/self.m #(1/self.mms[bkey].weight[:,:,:,:].var())/var_inv_sum
             self.subcnn.weight[:,:,:,:] += \
             vrinv*self.mms[bkey].weight[:,:,:,:]
             if self.bias:
@@ -124,7 +124,7 @@ class Linear_ien(nn.Module):
             self.sublin.bias.data.fill_(0)
 
         for bkey in range(self.m):
-            vrinv = (1/self.mms[bkey].weight[:,:].var())/var_inv_sum
+            vrinv = 1/self.m #(1/self.mms[bkey].weight[:,:].var())/var_inv_sum
             self.sublin.weight[:,:] += \
             vrinv*self.mms[bkey].weight[:,:]
             if self.bias:
